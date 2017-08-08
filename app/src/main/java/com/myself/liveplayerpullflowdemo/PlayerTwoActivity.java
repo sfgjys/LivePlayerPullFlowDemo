@@ -19,6 +19,7 @@ import android.view.GestureDetector.SimpleOnGestureListener;
 import android.widget.*;
 import com.alivc.player.AliVcMediaPlayer;
 import com.alivc.player.MediaPlayer;
+import com.myself.liveplayerpullflowdemo.port.StatusListener;
 
 import java.io.*;
 import java.util.ArrayList;

@@ -1,4 +1,4 @@
-package com.myself.liveplayerpullflowdemo;
+package com.myself.liveplayerpullflowdemo.port;
 
 public interface StatusListener {
     int notifyStatus(int status);

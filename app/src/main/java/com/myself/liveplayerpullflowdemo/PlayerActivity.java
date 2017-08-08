@@ -21,6 +21,7 @@ import android.widget.*;
 import com.alivc.player.AliVcMediaPlayer;
 import com.alivc.player.MediaPlayer;
 import com.alivc.player.NDKCallback;
+import com.myself.liveplayerpullflowdemo.port.StatusListener;
 
 import java.util.List;
 
@@ -111,8 +112,8 @@ public class PlayerActivity extends Activity {
 
                 isLastWifiConnected = false;
 
+                // TODO 在由wifi变为数据流量时走
                 if (mPlayer != null) {
-                    // TODO
                     mPosition = mPlayer.getCurrentPosition();
                     // 重点:新增接口,此处必须要将之前的surface释放掉
                     mPlayer.releaseVideoSurface();
@@ -120,8 +121,8 @@ public class PlayerActivity extends Activity {
                     mPlayer.destroy();
                     mPlayer = null;
                 }
-
                 dialog();
+
             }
         }
     };
@@ -154,6 +155,7 @@ public class PlayerActivity extends Activity {
     }
     // -------------------------------------------------------------------------------------------------------------------------------------------
 
+    // 设置播放状态监听
     void setStatusListener(StatusListener listener) {
         mStatusListener = listener;
     }
@@ -209,10 +211,10 @@ public class PlayerActivity extends Activity {
 
         setContentView(R.layout.activity_play);
 
-        // TODO
+        // TODO mPlayingIndex有什么用
         mPlayingIndex = -1;
 
-        // TEST初始化值为0
+        // TODO TEST初始化值为0
         if (TEST == 1) {
             mPlayerControl = new PlayerControl(this);
             mPlayerControl.setControllerListener(mController);
@@ -228,7 +230,7 @@ public class PlayerActivity extends Activity {
     private void acquireWakeLock() {
         if (mWakeLock == null) {
             // PowerManager用来控制电源状态的.
-            PowerManager powerManager = (PowerManager) this.getSystemService(this.POWER_SERVICE);
+            PowerManager powerManager = (PowerManager) this.getSystemService(POWER_SERVICE);
             // PowerManager.SCREEN_BRIGHT_WAKE_LOCK在Android3.2(API 13)后被废弃，使用FLAG_KEEP_SCREEN_ON代替。持锁将保持屏幕背光为最大亮度，而键盘背光可以熄灭。按下Power键后，此锁将会被系统自动释放，释放后屏幕与CPU均关闭。
             mWakeLock = powerManager.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK, "SmsSyncService.sync() wakelock.");
         }
@@ -270,7 +272,6 @@ public class PlayerActivity extends Activity {
         // 创建SurfaceView控件
         mSurfaceView = new SurfaceView(this);
 
-        // TODO
         mGestureDetector = new GestureDetector(this, new MyGestureListener());
 
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
@@ -300,16 +301,14 @@ public class PlayerActivity extends Activity {
                     return true;
                 }
 
-                // 抬起触摸事件
+                // TODO SurfaceView抬起触摸事件
                 if (event.getAction() == MotionEvent.ACTION_UP) {
 
-                    // TODO
                     if (mPlayer != null && !mPlayer.isPlaying() && mPlayer.getDuration() > 0) {
                         start();
                         return false;
                     }
-
-                    //just show the progress bar  判断按下在抬起的间隔时间超过200ms TODO
+                    //just show the progress bar  判断按下在抬起的间隔时间超过200ms
                     if ((System.currentTimeMillis() - mLastDownTimestamp) > 200) {
                         show_progress_ui(true);
                         mTimerHandler.postDelayed(mUIRunnable, 3000);
@@ -329,11 +328,13 @@ public class PlayerActivity extends Activity {
         mSurfaceHolder = mSurfaceView.getHolder();
         mSurfaceHolder.addCallback(mSurfaceHolderCB);
 
+        // mPlayingIndex初始值-1  msURI和msTitle初始值为""  方法内获取播放地址存储在了msURI内
         mPlayingIndex = getVideoSourcePath(mPlayingIndex, msURI, msTitle);
 
         return true;
     }
 
+    // TODO  SurfaceView的触摸事件中有可能被调用
     private class MyGestureListener extends SimpleOnGestureListener {
 
         @Override
@@ -378,7 +379,6 @@ public class PlayerActivity extends Activity {
 
             Log.d(TAG, "AlivcPlayer onSurfaceCreated.");
 
-            // TODO
             // 重点:
             if (mPlayer != null) {
                 // 对于从后台切换到前台,需要重设surface;部分手机锁屏也会做前后台切换的处理
@@ -408,29 +408,180 @@ public class PlayerActivity extends Activity {
     };
     // --------------------------------------------------------------------------------------------------------------------------------------------
 
+    // **********************************************获取从上一个Activity中传递过来的播放url地址等信息**********************************************
+    private int getVideoSourcePath(int curIndex, StringBuilder sURI, StringBuilder sTitle) {
+        //清空所有信息
+        sURI.delete(0, sURI.length());
+        sTitle.delete(0, sTitle.length());
+
+        Bundle bundle = getIntent().getExtras();
+        int selected = -1;
+        if (curIndex == -1) { //我们所选择的播放视频
+            sTitle.append(bundle.getString("TITLE"));
+            sURI.append(bundle.getString("URI"));
+        }
+
+        // 多视频循环地址获取
+        Bundle loopBundle = bundle.getBundle("loopList");
+        if (loopBundle != null) {
+            int count = loopBundle.getInt("ItemCount");
+            if (curIndex == -1) {
+                selected = loopBundle.getInt("SelectedIndex");
+            } else {
+                selected = curIndex + 1;
+                selected = (selected == count ? 0 : selected);
+                sURI.append(loopBundle.getString("URI" + selected));
+                sTitle.append(loopBundle.getString("TITLE" + selected));
+            }
+        }
+
+        return selected;
+    }
+    // ------------------------------------------------------------------------------------------------------------------------------------------------
+
+    // ****************************************************************准备开始播发，初始化播放器****************************************************************
+    private boolean startToPlay() {
+        Log.d(TAG, "start play.");
+
+        // 重置ui
+        mSeekBar.setProgress(0);
+        show_pause_ui(false, false);
+        show_progress_ui(false);
+        mErrInfoView.setText("");
+
+        if (mPlayer == null) {
+            //  ★★★★★★★★★★★★★★★★★★初始化播放器★★★★★★★★★★★★★★★★★★★★
+            // 创建player对象
+            mPlayer = new AliVcMediaPlayer(this, mSurfaceView);
+            // 播放器就绪事件
+            mPlayer.setPreparedListener(new VideoPreparedListener());
+            // 异常错误事件
+            mPlayer.setErrorListener(new VideoErrorListener());
+            // 信息状态监听事件
+            mPlayer.setInfoListener(new VideoInfolistener());
+            // seek结束事件（备注：直播无seek操作）
+            mPlayer.setSeekCompleteListener(new VideoSeekCompletelistener());
+            // 播放结束事件
+            mPlayer.setCompletedListener(new VideoCompletelistener());
+            // 画面大小变化事件
+            mPlayer.setVideoSizeChangeListener(new VideoSizeChangelistener());
+            // 缓冲信息更新事件
+            mPlayer.setBufferingUpdateListener(new VideoBufferUpdatelistener());
+            // 停止事件
+            mPlayer.setStopedListener(new VideoStoppedListener());
+
+            // 如果同时支持软解和硬解是有用 ？？？？？？？？？？？？？？？？？？？？
+            Bundle bundle = getIntent().getExtras();
+
+            // 解码器类型。0代表硬件解码器；1代表软件解码器。
+            // 备注：默认为软件解码。由于android手机硬件适配性的问题，很多android手机的硬件解码会有问题，所以，我们建议尽量使用软件解码。
+            mPlayer.setDefaultDecoder(1);
+
+            // 重点: 在调试阶段可以使用以下方法打开native log
+            mPlayer.enableNativeLog();
+
+            // mPosition初始值为0
+            if (mPosition != 0) {
+                // 跳转到指定位置前的第一个关键帧的位置。
+                mPlayer.seekTo(mPosition);
+            }
+        }
+
+        // 设置标题
+        TextView vt = findViewById(R.id.video_title);
+        vt.setText(msTitle.toString());
+        vt.setVisibility(View.VISIBLE);
+
+        // 准备开始播放
+        mPlayer.prepareAndPlay(msURI.toString());
+
+        //播放加密视频使用如下：？？？？？？？？？？？？？？？？？？？？？
+        // VidSource vidSource = new VidSource();
+        // vidSource.setVid("视频id");
+        // vidSource.setAcId("你的accessKeyId");
+        // vidSource.setAcKey("你的accessKeySecret");
+        // vidSource.setStsToken("你的STS token");
+        // vidSource.setDomainRegion("你的domain");
+        // vidSource.setAuthInfo(你的authinfo");
+        // mPlayer.prepareAndPlayWithVid(vidSource);
+
+        if (mStatusListener != null)
+            mStatusListener.notifyStatus(STATUS_START);// 通知状态为开始
+
+        // 5秒后显示是硬解码还是软解码
+        new Handler().postDelayed(new Runnable() {
+            public void run() {
+                mDecoderTypeView.setText(NDKCallback.getDecoderType() == 0 ? "HardDeCoder" : "SoftDecoder");
+            }
+        }, 5000);
+        return true;
+    }
+    // --------------------------------------------------------------------------------------------------------------------------------------
+
+    // ***************************************************界面左上角的三个按钮的点击事件***********************************************************************
+    public void switchScalingMode(View view) {
+        if (mPlayer != null) {
+            if (mScalingMode == MediaPlayer.VideoScalingMode.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING) {
+                mPlayer.setVideoScalingMode(MediaPlayer.VideoScalingMode.VIDEO_SCALING_MODE_SCALE_TO_FIT);
+                mScalingMode = MediaPlayer.VideoScalingMode.VIDEO_SCALING_MODE_SCALE_TO_FIT;
+            } else {
+                mPlayer.setVideoScalingMode(MediaPlayer.VideoScalingMode.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING);
+                mScalingMode = MediaPlayer.VideoScalingMode.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING;
+            }
+        }
+    }
+
+    public void switchMute(View view) {
+        if (mPlayer != null) {
+            if (!mMute) {
+                mMute = true;
+                mPlayer.setMuteMode(true);
+            } else {
+                mMute = false;
+                mPlayer.setMuteMode(false);
+            }
+        }
+    }
+
+    public void reStart(View view) {
+        if (mPlayer != null) {
+            mPlayer.stop();
+            new Thread(new Runnable() {
+                public void run() {
+
+                    while (!isStopPlayer) {
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                    mPlayer.prepareAndPlay(msURI.toString());
+                }
+            }).start();
+        }
+    }
+    // ----------------------------------------------------------------------------------------------------------------------------------------
+
 
     private void update_progress(int ms) {
         if (mEnableUpdateProgress) {
             mSeekBar.setProgress(ms);
         }
-        return;
     }
 
     private void update_second_progress(int ms) {
         if (mEnableUpdateProgress) {
             mSeekBar.setSecondaryProgress(ms);
         }
-        return;
     }
 
     private void show_progress_ui(boolean bShowPause) {
-        LinearLayout progress_layout = (LinearLayout) findViewById(R.id.progress_layout);
-        TextView video_title = (TextView) findViewById(R.id.video_title);
-
+        LinearLayout progress_layout = findViewById(R.id.progress_layout);
+        TextView video_title = findViewById(R.id.video_title);
         if (bShowPause) {
             progress_layout.setVisibility(View.VISIBLE);
             video_title.setVisibility(View.VISIBLE);
-
         } else {
 //            progress_layout.setVisibility(View.GONE);
 //            video_title.setVisibility(View.GONE);
@@ -438,19 +589,17 @@ public class PlayerActivity extends Activity {
     }
 
     private void show_pause_ui(boolean bShowPauseBtn, boolean bShowReplayBtn) {
-        LinearLayout layout = (LinearLayout) findViewById(R.id.buttonLayout);
+        LinearLayout layout = findViewById(R.id.buttonLayout);
         if (!bShowPauseBtn && !bShowReplayBtn) {
             layout.setVisibility(View.GONE);
         } else {
             layout.setVisibility(View.VISIBLE);
         }
-        ImageView pause_view = (ImageView) findViewById(R.id.pause_button);
+        ImageView pause_view = findViewById(R.id.pause_button);
         pause_view.setVisibility(bShowPauseBtn ? View.VISIBLE : View.GONE);
 
-        Button replay_btn = (Button) findViewById(R.id.replay_button);
+        Button replay_btn = findViewById(R.id.replay_button);
         replay_btn.setVisibility(bShowReplayBtn ? View.VISIBLE : View.GONE);
-
-        return;
     }
 
     private int show_tip_ui(boolean bShowTip, float percent) {
@@ -492,11 +641,11 @@ public class PlayerActivity extends Activity {
         int var = (int) (ms / 1000.0f + 0.5f);
         int min = var / 60;
         int sec = var % 60;
-        TextView total = (TextView) findViewById(R.id.total_duration);
+        TextView total = findViewById(R.id.total_duration);
         total.setText("" + min + ":" + sec);
 
 
-        SeekBar sb = (SeekBar) findViewById(R.id.progress);
+        SeekBar sb = findViewById(R.id.progress);
         sb.setMax(ms);
         sb.setKeyProgressIncrement(10000); //5000ms = 5sec.
         sb.setProgress(0);
@@ -534,63 +683,16 @@ public class PlayerActivity extends Activity {
     }
 
 
-    public void switchScalingMode(View view) {
-        if (mPlayer != null) {
-            if (mScalingMode == MediaPlayer.VideoScalingMode.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING) {
-                mPlayer.setVideoScalingMode(MediaPlayer.VideoScalingMode.VIDEO_SCALING_MODE_SCALE_TO_FIT);
-                mScalingMode = MediaPlayer.VideoScalingMode.VIDEO_SCALING_MODE_SCALE_TO_FIT;
-            } else {
-                mPlayer.setVideoScalingMode(MediaPlayer.VideoScalingMode.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING);
-                mScalingMode = MediaPlayer.VideoScalingMode.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING;
-            }
-        }
-    }
-
-    public void switchMute(View view) {
-        if (mPlayer != null) {
-            if (mMute == false) {
-                mMute = true;
-                mPlayer.setMuteMode(true);
-            } else {
-                mMute = false;
-                mPlayer.setMuteMode(false);
-            }
-        }
-    }
-
-    public void reStart(View view) {
-        if (mPlayer != null) {
-            mPlayer.stop();
-            new Thread(new Runnable() {
-                public void run() {
-
-                    while (!isStopPlayer) {
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                    mPlayer.prepareAndPlay(msURI.toString());
-                }
-            }).start();
-        }
-    }
-
-    public void gotoActivity(View view) {
-        startActivity(new Intent(this, BlankActivity.class));
-    }
-
     public void switchSurface(View view) {
         if (mPlayer != null) {
             // release old surface;
             mPlayer.releaseVideoSurface();
             mSurfaceHolder.removeCallback(mSurfaceHolderCB);
-            FrameLayout frameContainer = (FrameLayout) findViewById(R.id.GLViewContainer);
+            FrameLayout frameContainer = findViewById(R.id.GLViewContainer);
             frameContainer.removeAllViews();
 
             // init surface
-            LinearLayout linearLayout = (LinearLayout) findViewById(R.id.surface_view_container);
+            LinearLayout linearLayout = findViewById(R.id.surface_view_container);
             mSurfaceView = new SurfaceView(this);
 //            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT);
 //            params.gravity = Gravity.CENTER;
@@ -602,96 +704,6 @@ public class PlayerActivity extends Activity {
         }
     }
 
-
-    private int getVideoSourcePath(int curIndex, StringBuilder sURI, StringBuilder sTitle) {
-        //clear all now
-        sURI.delete(0, sURI.length());
-        sTitle.delete(0, sTitle.length());
-
-        Bundle bundle = (Bundle) getIntent().getExtras();
-        int selected = -1;
-        if (curIndex == -1) { //we play the selected item
-            sTitle.append(bundle.getString("TITLE"));
-            sURI.append(bundle.getString("URI"));
-        }
-        Bundle loopBundle = bundle.getBundle("loopList");
-        if (loopBundle != null) {
-            int count = loopBundle.getInt("ItemCount");
-            if (curIndex == -1) {
-                selected = loopBundle.getInt("SelectedIndex");
-            } else {
-                selected = curIndex + 1;
-                selected = (selected == count ? 0 : selected);
-                sURI.append(loopBundle.getString("URI" + selected));
-                sTitle.append(loopBundle.getString("TITLE" + selected));
-            }
-        }
-        return selected;
-    }
-
-    ;
-
-    private boolean startToPlay() {
-        Log.d(TAG, "start play.");
-        resetUI();
-
-        if (mPlayer == null) {
-            // 初始化播放器
-            mPlayer = new AliVcMediaPlayer(this, mSurfaceView);
-            mPlayer.setPreparedListener(new VideoPreparedListener());
-            mPlayer.setErrorListener(new VideoErrorListener());
-            mPlayer.setInfoListener(new VideoInfolistener());
-            mPlayer.setSeekCompleteListener(new VideoSeekCompletelistener());
-            mPlayer.setCompletedListener(new VideoCompletelistener());
-            mPlayer.setVideoSizeChangeListener(new VideoSizeChangelistener());
-            mPlayer.setBufferingUpdateListener(new VideoBufferUpdatelistener());
-            mPlayer.setStopedListener(new VideoStoppedListener());
-            // 如果同时支持软解和硬解是有用
-            Bundle bundle = (Bundle) getIntent().getExtras();
-            mPlayer.setDefaultDecoder(1);
-            // 重点: 在调试阶段可以使用以下方法打开native log
-            mPlayer.enableNativeLog();
-
-            if (mPosition != 0) {
-                mPlayer.seekTo(mPosition);
-            }
-        }
-
-        TextView vt = (TextView) findViewById(R.id.video_title);
-        vt.setText(msTitle.toString());
-        vt.setVisibility(View.VISIBLE);
-
-
-        mPlayer.prepareAndPlay(msURI.toString());
-        //播放加密视频使用如下：
-        // VidSource vidSource = new VidSource();
-        // vidSource.setVid("视频id");
-        // vidSource.setAcId("你的accessKeyId");
-        // vidSource.setAcKey("你的accessKeySecret");
-        // vidSource.setStsToken("你的STS token");
-        // vidSource.setDomainRegion("你的domain");
-        // vidSource.setAuthInfo(你的authinfo");
-
-        // mPlayer.prepareAndPlayWithVid(vidSource);
-
-        if (mStatusListener != null)
-            mStatusListener.notifyStatus(STATUS_START);
-
-        new Handler().postDelayed(new Runnable() {
-            public void run() {
-                mDecoderTypeView.setText(NDKCallback.getDecoderType() == 0 ? "HardDeCoder" : "SoftDecoder");
-            }
-        }, 5000);
-        return true;
-
-    }
-
-    private void resetUI() {
-        mSeekBar.setProgress(0);
-        show_pause_ui(false, false);
-        show_progress_ui(false);
-        mErrInfoView.setText("");
-    }
 
     //pause the video
     private void pause() {
@@ -733,6 +745,167 @@ public class PlayerActivity extends Activity {
         }
     }
 
+    @Override
+    protected void onDestroy() {
+        Log.e(TAG, "AudioRender: onDestroy.");
+        if (mPlayer != null) {
+//            stop();
+            mTimerHandler.removeCallbacks(mRunnable);
+        }
+
+        releaseWakeLock();
+
+        // 解除注册的网络状态变化监听广播
+        if (connectionReceiver != null) {
+            unregisterReceiver(connectionReceiver);
+        }
+
+
+        // 重点:在 activity destroy的时候,要停止播放器并释放播放器
+        if (mPlayer != null) {
+            mPosition = mPlayer.getCurrentPosition();
+            stop();
+            if (mPlayerControl != null)
+                mPlayerControl.stop();
+        }
+
+        super.onDestroy();
+    }
+
+    @Override
+    protected void onResume() {
+        Log.e(TAG, "onResume");
+        super.onResume();
+
+        // 重点:如果播放器是从锁屏/后台切换到前台,那么调用player.stat
+        if (mPlayer != null && !isStopPlayer && isPausePlayer) {
+            if (!isPausedByUser) {
+                isPausePlayer = false;
+                mPlayer.play();
+                // 更新ui
+                show_pause_ui(false, false);
+                show_progress_ui(false);
+            }
+        }
+    }
+
+    @Override
+    protected void onStart() {
+        Log.e(TAG, "onStart.");
+        super.onStart();
+        if (!isCurrentRunningForeground) {
+            Log.d(TAG, ">>>>>>>>>>>>>>>>>>>切到前台 activity process");
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        Log.e(TAG, "onPause." + isStopPlayer + " " + isPausePlayer + " " + (mPlayer == null));
+        super.onPause();
+        // 重点:播放器没有停止,也没有暂停的时候,在activity的pause的时候也需要pause
+        if (!isStopPlayer && !isPausePlayer && mPlayer != null) {
+            Log.e(TAG, "onPause mpayer.");
+            mPlayer.pause();
+            isPausePlayer = true;
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        Log.e(TAG, "onStop.");
+        super.onStop();
+
+        isCurrentRunningForeground = isRunningForeground();
+        if (!isCurrentRunningForeground) {
+            Log.d(TAG, ">>>>>>>>>>>>>>>>>>>切到后台 activity process");
+        }
+    }
+
+    private Handler mTimerHandler = new Handler() {
+        public void handleMessage(Message msg) {
+            System.out.println();
+            switch (msg.what) {
+
+                case CMD_PAUSE:
+                    pause();
+                    break;
+                case CMD_RESUME:
+                    start();
+                    break;
+                case CMD_SEEK:
+                    mPlayer.seekTo(msg.arg1);
+                    break;
+                case CMD_START:
+                    startToPlay();
+                    break;
+                case CMD_STOP:
+                    stop();
+                    break;
+                case CMD_VOLUME:
+                    mPlayer.setVolume(msg.arg1);
+                    break;
+                default:
+                    break;
+            }
+        }
+    };
+    Runnable mRunnable = new Runnable() {
+        @Override
+        public void run() {
+
+            if (mPlayer != null && mPlayer.isPlaying())
+                update_progress(mPlayer.getCurrentPosition());
+
+            mTimerHandler.postDelayed(this, 1000);
+        }
+    };
+
+    Runnable mUIRunnable = new Runnable() {
+        @Override
+        public void run() {
+            show_progress_ui(false);
+        }
+    };
+
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            isStopPlayer = true;
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
+    // 重点:判定是否在前台工作
+    public boolean isRunningForeground() {
+        ActivityManager activityManager = (ActivityManager) this.getSystemService(Context.ACTIVITY_SERVICE);
+        List<ActivityManager.RunningAppProcessInfo> appProcessInfos = activityManager.getRunningAppProcesses();
+        // 枚举进程
+        for (ActivityManager.RunningAppProcessInfo appProcessInfo : appProcessInfos) {
+            if (appProcessInfo.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND) {
+                if (appProcessInfo.processName.equals(this.getApplicationInfo().processName)) {
+                    Log.d(TAG, "EntryActivity isRunningForeGround");
+                    return true;
+                }
+            }
+        }
+        Log.d(TAG, "EntryActivity isRunningBackGround");
+        return false;
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+
+//        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT);
+//        params.gravity = Gravity.CENTER;
+//        mSurfaceView.setLayoutParams(params);
+    }
+
+
+    // TODO *********************************************************各种监听回调对象*********************************************************
+
     /**
      * 准备完成监听器:调度更新进度
      */
@@ -758,7 +931,7 @@ public class PlayerActivity extends Activity {
     private class VideoErrorListener implements MediaPlayer.MediaPlayerErrorListener {
 
         public void onError(int what, int extra) {
-            int errCode = 0;
+            int errCode;
 
             if (mPlayer == null) {
                 return;
@@ -822,6 +995,7 @@ public class PlayerActivity extends Activity {
 
         public void onInfo(int what, int extra) {
             Log.d(TAG, "onInfo what = " + what + " extra = " + extra);
+            System.out.println();
             switch (what) {
                 case MediaPlayer.MEDIA_INFO_UNKNOW:
                     break;
@@ -904,6 +1078,9 @@ public class PlayerActivity extends Activity {
         }
     }
 
+    /**
+     * 视频停止监听器
+     */
     private class VideoStoppedListener implements MediaPlayer.MediaPlayerStopedListener {
         @Override
         public void onStopped() {
@@ -911,163 +1088,6 @@ public class PlayerActivity extends Activity {
             isStopPlayer = true;
         }
     }
+    // --------------------------------------------------------------------------------------------------------------
 
-    @Override
-    protected void onDestroy() {
-        Log.e(TAG, "AudioRender: onDestroy.");
-        if (mPlayer != null) {
-//            stop();
-            mTimerHandler.removeCallbacks(mRunnable);
-        }
-
-        releaseWakeLock();
-
-        // 解除注册的网络状态变化监听广播
-        if (connectionReceiver != null) {
-            unregisterReceiver(connectionReceiver);
-        }
-
-
-        // 重点:在 activity destroy的时候,要停止播放器并释放播放器
-        if (mPlayer != null) {
-            mPosition = mPlayer.getCurrentPosition();
-            stop();
-            if (mPlayerControl != null)
-                mPlayerControl.stop();
-        }
-
-        super.onDestroy();
-        return;
-    }
-
-    @Override
-    protected void onResume() {
-        Log.e(TAG, "onResume");
-        super.onResume();
-
-        // 重点:如果播放器是从锁屏/后台切换到前台,那么调用player.stat
-        if (mPlayer != null && !isStopPlayer && isPausePlayer) {
-            if (!isPausedByUser) {
-                isPausePlayer = false;
-                mPlayer.play();
-                // 更新ui
-                show_pause_ui(false, false);
-                show_progress_ui(false);
-            }
-        }
-    }
-
-    @Override
-    protected void onStart() {
-        Log.e(TAG, "onStart.");
-        super.onStart();
-        if (!isCurrentRunningForeground) {
-            Log.d(TAG, ">>>>>>>>>>>>>>>>>>>切到前台 activity process");
-        }
-    }
-
-    @Override
-    protected void onPause() {
-        Log.e(TAG, "onPause." + isStopPlayer + " " + isPausePlayer + " " + (mPlayer == null));
-        super.onPause();
-        // 重点:播放器没有停止,也没有暂停的时候,在activity的pause的时候也需要pause
-        if (!isStopPlayer && !isPausePlayer && mPlayer != null) {
-            Log.e(TAG, "onPause mpayer.");
-            mPlayer.pause();
-            isPausePlayer = true;
-        }
-    }
-
-    @Override
-    protected void onStop() {
-        Log.e(TAG, "onStop.");
-        super.onStop();
-
-        isCurrentRunningForeground = isRunningForeground();
-        if (!isCurrentRunningForeground) {
-            Log.d(TAG, ">>>>>>>>>>>>>>>>>>>切到后台 activity process");
-        }
-    }
-
-    private Handler mTimerHandler = new Handler() {
-        public void handleMessage(Message msg) {
-
-            switch (msg.what) {
-
-                case CMD_PAUSE:
-                    pause();
-                    break;
-                case CMD_RESUME:
-                    start();
-                    break;
-                case CMD_SEEK:
-                    mPlayer.seekTo(msg.arg1);
-                    break;
-                case CMD_START:
-                    startToPlay();
-                    break;
-                case CMD_STOP:
-                    stop();
-                    break;
-                case CMD_VOLUME:
-                    mPlayer.setVolume(msg.arg1);
-                    break;
-                default:
-                    break;
-            }
-        }
-    };
-    Runnable mRunnable = new Runnable() {
-        @Override
-        public void run() {
-
-            if (mPlayer != null && mPlayer.isPlaying())
-                update_progress(mPlayer.getCurrentPosition());
-
-            mTimerHandler.postDelayed(this, 1000);
-        }
-    };
-
-    Runnable mUIRunnable = new Runnable() {
-        @Override
-        public void run() {
-            show_progress_ui(false);
-        }
-    };
-
-
-    @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
-
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
-            isStopPlayer = true;
-        }
-        return super.onKeyDown(keyCode, event);
-    }
-
-    // 重点:判定是否在前台工作
-    public boolean isRunningForeground() {
-        ActivityManager activityManager = (ActivityManager) this.getSystemService(Context.ACTIVITY_SERVICE);
-        List<ActivityManager.RunningAppProcessInfo> appProcessInfos = activityManager.getRunningAppProcesses();
-        // 枚举进程
-        for (ActivityManager.RunningAppProcessInfo appProcessInfo : appProcessInfos) {
-            if (appProcessInfo.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND) {
-                if (appProcessInfo.processName.equals(this.getApplicationInfo().processName)) {
-                    Log.d(TAG, "EntryActivity isRunningForeGround");
-                    return true;
-                }
-            }
-        }
-        Log.d(TAG, "EntryActivity isRunningBackGround");
-        return false;
-    }
-
-    @Override
-    public void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
-
-//        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT);
-//        params.gravity = Gravity.CENTER;
-//        mSurfaceView.setLayoutParams(params);
-    }
 }

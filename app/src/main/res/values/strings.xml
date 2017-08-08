@@ -1,0 +1,27 @@
+<resources>
+    <string name="app_name">LivePullFlow</string>
+    <string name="action_settings">Settings</string>
+    <string name="file_list_title">视频列表</string>
+    <string name="description">图片</string>
+    <string name="hello_world">Hello world!</string>
+    <string name="menu_settings">Settings</string>
+    <string name="title_activity_main">MainActivity</string>
+    <string name="open_file_error_format">The format of file is error</string>
+    <string name="open_file_none">"You don't choose any file"</string>
+    <string name="empty_hint">The directory is empty</string>
+    <string name="sdcard_unmonted_hint">Please mount the sdcard at first</string>
+    <string name="player_demo1">播放Demo1</string>
+    <string name="player_demo2">播放Demo2</string>
+    <string name="much_player_demo">多播放器Demo</string>
+    <string name="only_image">只是一个图片</string>
+    <string name="xxxxxxxxxxxxxxx">xxxxxxxxxxxxxxx</string>
+    <string name="local">local</string>
+    <string name="title">标题</string>
+    <string name="buffering">Buffering</string>
+    <string name="error">错误:</string>
+    <string name="chong_bo">重播</string>
+    <string name="_00_00">00:00</string>
+    <string name="switchscalingmode">切换缩放模式</string>
+    <string name="switchmute">切换静音</string>
+    <string name="restart">重启</string>
+</resources>

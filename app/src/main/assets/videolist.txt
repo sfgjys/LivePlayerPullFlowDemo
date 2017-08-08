@@ -1,0 +1,5 @@
+m3u8[终极大冒险] 3 hd http://140.205.13.254/hls_video/TB2wM5ebXXXXXc.XXXXXXXXXXXX/0.m3u8
+m3u8[辛巴达历险记] 3 hd http://140.205.13.254/hls_video/TB2UpXMbXXXXXX8XpXXXXXXXXXX/0.m3u8
+m3u8[异度迷局] 3 hd http://140.205.13.254/hls_video/TB26VJUbXXXXXaTXpXXXXXXXXXX/0.m3u8
+m3u8[最后的风之子] 3 hd http://140.205.13.254/hls_video/TB2bp2ibXXXXXabXpXXXXXXXXXX/0.m3u8
+m3u8[菲利普斯船长] 3 hd http://140.205.13.254/hls_video/TB2ChimbXXXXXavXXXXXXXXXXXX/0.m3u8

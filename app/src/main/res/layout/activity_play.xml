@@ -1,0 +1,234 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/container"
+    style="@android:style/Theme.NoTitleBar.Fullscreen"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:padding="0dp">
+
+    <FrameLayout
+        android:id="@+id/GLViewContainer"
+        android:layout_width="fill_parent"
+        android:layout_height="400dp"
+        android:layout_alignParentBottom="false"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentRight="true"
+        android:layout_alignParentTop="true"
+        android:layout_margin="0dp"
+        android:layout_marginBottom="0dp"
+        android:layout_marginLeft="0dp"
+        android:layout_marginRight="0dp"
+        android:layout_marginTop="0dp"
+        android:background="@android:color/transparent"
+        android:padding="0dp"
+        android:paddingBottom="0dp"
+        android:paddingEnd="0dp"
+        android:paddingLeft="0dp"
+        android:paddingRight="0dp"
+        android:paddingStart="0dp"
+        android:paddingTop="0dp">
+        <!--<SurfaceView -->
+        <!--android:id="@+id/surface_view"-->
+        <!--android:layout_width="fill_parent" -->
+        <!--android:layout_height="fill_parent"/>-->
+
+    </FrameLayout>
+
+    <LinearLayout
+        android:id="@+id/Title"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:layout_gravity="center_horizontal|top"
+        android:background="#00FFFFFF"
+        android:orientation="horizontal"
+        android:textAlignment="center">
+
+        <TextView
+            android:id="@+id/video_title"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:gravity="center"
+            android:text="@string/title"
+            android:textSize="25dp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/LayoutTip"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_centerVertical="true"
+        android:layout_gravity="center"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/text_tip"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:gravity="center_horizontal"
+            android:text="@string/buffering"
+            android:textAppearance="?android:attr/textAppearanceLarge"
+            android:textColor="#00AA00"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/error_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#00FFFFFF"
+        android:orientation="horizontal"
+        android:visibility="visible">
+
+        <TextView
+            android:id="@+id/error_info"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="@string/error"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:textSize="30dp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/buttonLayout"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="false"
+        android:layout_alignParentRight="false"
+        android:layout_below="@+id/LayoutTip"
+        android:layout_centerInParent="true"
+        android:background="#00FFFFFF"
+        android:gravity="center|center_horizontal"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/pause_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:src="@mipmap/vp_pause"
+            android:visibility="visible" />
+
+        <Button
+            android:id="@+id/replay_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:text="@string/chong_bo"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/progress_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignBottom="@id/GLViewContainer"
+        android:layout_gravity="center_horizontal|top"
+        android:layout_marginBottom="20dp"
+        android:background="#00000000"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/current_duration"
+            android:layout_width="50dp"
+            android:layout_height="fill_parent"
+            android:layout_marginTop="5dp"
+            android:background="#00FFFFFF"
+            android:gravity="right"
+            android:paddingLeft="2dp"
+            android:text="@string/_00_00"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:textColor="#CCCCCC" />
+
+        <SeekBar
+            android:id="@+id/progress"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="10"
+            android:focusable="true"
+            android:max="100000000"
+            android:maxHeight="6dp"
+            android:minHeight="6dp"
+            android:paddingLeft="10dp"
+            android:paddingRight="10dp"
+            android:progress="0"
+            android:progressDrawable="@drawable/seekbar_style"
+            android:thumb="@mipmap/seek_thumb"
+            android:thumbOffset="1dip" />
+
+        <TextView
+            android:id="@+id/total_duration"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:background="#00FFFFFF"
+            android:clickable="false"
+            android:paddingRight="2dp"
+            android:text="@string/_00_00"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:textColor="#CCCCCC" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/decoder_type"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_margin="10dp"
+        android:background="#00FFFFFF"
+        android:clickable="false"
+        android:gravity="center"
+        android:padding="10dp"
+        android:text=""
+        android:textColor="#CCCCCC"
+        android:visibility="visible" />
+
+    <LinearLayout
+        android:id="@+id/surface_view_container"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:orientation="horizontal" />
+    <!--<Button android:layout_width="wrap_content" android:layout_height="wrap_content"-->
+    <!--android:text="SwitchSurface"-->
+    <!--android:onClick="switchSurface"-->
+    <!--android:layout_alignParentTop="true"-->
+    <!--android:layout_alignParentLeft="true"-->
+    <!--android:visibility="visible"/>-->
+    <Button
+        android:id="@+id/btn_scale"
+
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentTop="true"
+        android:onClick="switchScalingMode"
+        android:text="@string/switchscalingmode"
+        android:visibility="visible" />
+
+    <Button
+        android:id="@+id/btn_mute"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_below="@id/btn_scale"
+        android:onClick="switchMute"
+        android:text="@string/switchmute"
+        android:visibility="visible" />
+
+    <Button
+        android:id="@+id/btn_restart"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_below="@id/btn_mute"
+        android:onClick="reStart"
+        android:text="@string/restart"
+        android:visibility="visible" />
+</RelativeLayout>

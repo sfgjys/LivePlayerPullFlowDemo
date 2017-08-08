@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent">
+
+    <LinearLayout
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:orientation="vertical">
+
+        <RelativeLayout
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:background="#0096ff">
+
+            <TextView
+                android:id="@+id/listViewTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"
+                android:paddingBottom="6dp"
+                android:paddingTop="6dp"
+                android:text="@string/file_list_title"
+                android:textSize="22sp" />
+
+
+        </RelativeLayout>
+
+        <!-- android:choiceMode="singleChoice"单选模式 -->
+        <!-- android:drawSelectorOnTop="false" 点击某条记录不放，颜色会在记录的后面，成为背景色，但是记录内容的文字是可见的-->
+        <ListView
+            android:id="@+id/player_one_fileListView"
+            android:layout_width="fill_parent"
+            android:layout_height="match_parent"
+            android:background="#ffffff"
+            android:choiceMode="singleChoice"
+            android:clickable="true"
+            android:divider="#eeeeee"
+            android:dividerHeight="1dp"
+            android:drawSelectorOnTop="false"
+            android:focusable="true" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/scanInfoView"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:background="#eeeeee"
+        android:maxLines="1"
+        android:paddingBottom="4dp"
+        android:paddingLeft="8dp"
+        android:paddingTop="4dp"
+        android:text="@string/file_list_title"
+        android:textSize="16sp"
+        android:visibility="gone" />
+</RelativeLayout>

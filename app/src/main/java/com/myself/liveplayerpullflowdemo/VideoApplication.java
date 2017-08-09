@@ -58,12 +58,7 @@ public class VideoApplication extends Application {
                 // 业务ID，用户自行设置，用于标识使用播放器sdk的APP。如“淘宝直播”就设置“TaobaoLive”。
                 final String businessId = "kuku_live";
 
-                // 初始化播放器
-                AliVcMediaPlayer.init(getApplicationContext(), businessId, new AccessKeyCallback() {
-                    public AccessKey getAccessToken() {
-                        return new AccessKey(accessKeyId, accessKeySecret);
-                    }
-                });
+
 
             } catch (Throwable t) {
                 t.printStackTrace();

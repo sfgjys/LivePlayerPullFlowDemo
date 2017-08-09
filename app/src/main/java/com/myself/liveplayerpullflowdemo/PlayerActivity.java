@@ -49,19 +49,11 @@ public class PlayerActivity extends Activity {
     private SurfaceHolder mSurfaceHolder = null;
     private SurfaceView mSurfaceView = null;
 
-    private SeekBar mSeekBar = null;
-    private TextView mTipView = null;
-    private TextView mCurDurationView = null;
-    private TextView mErrInfoView = null;
-    private TextView mDecoderTypeView = null;
-    private LinearLayout mTipLayout = null;
 
     private boolean mEnableUpdateProgress = true;
     private int mLastPercent = -1;
-    private int mPlayingIndex = -1;
     private StringBuilder msURI = new StringBuilder("");
     private StringBuilder msTitle = new StringBuilder("");
-    private GestureDetector mGestureDetector;
     private int mPosition = 0;
     private int mVolumn = 50;
     private MediaPlayer.VideoScalingMode mScalingMode = MediaPlayer.VideoScalingMode.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING;
@@ -79,9 +71,41 @@ public class PlayerActivity extends Activity {
     // 标记播放器是否已经暂停
     private boolean isPausePlayer = false;
     private boolean isPausedByUser = false;
-    //用来控制应用前后台切换的逻辑
+    // 用来控制应用前后台切换的逻辑
     private boolean isCurrentRunningForeground = true;
 
+    // ---------------------------------------------------------------------------------------------------------------------------------------------
+
+
+    // 该对象只是用于在触摸SurfaceView时消费特定的手势动作
+    private GestureDetector mGestureDetector;
+    // -1代表是播放指定网络视频，不是-1则是多视频循环播放
+    private int mPlayingIndex = -1;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        // 注册一个网络状态变化监听的广播,用于wifi切换倒4g时的提示
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
+        registerReceiver(connectionReceiver, intentFilter);
+
+        setContentView(R.layout.activity_play);
+
+        // -1代表是播放指定网络视频，不是-1则是多视频循环播放
+        mPlayingIndex = -1;
+
+        // TODO TEST初始化值为0 ，且TEST的值一直没变
+        if (TEST == 1) {
+            mPlayerControl = new PlayerControl(this);
+            mPlayerControl.setControllerListener(mController);
+        }
+
+        acquireWakeLock();
+
+        initView();
+    }
 
     // ***********************************************************当wifi切换到4g时,提示用户是否需要继续播放***************************************************************************
     private boolean isLastWifiConnected = false;
@@ -155,76 +179,6 @@ public class PlayerActivity extends Activity {
     }
     // -------------------------------------------------------------------------------------------------------------------------------------------
 
-    // 设置播放状态监听
-    void setStatusListener(StatusListener listener) {
-        mStatusListener = listener;
-    }
-
-    private PlayerControl.ControllerListener mController = new PlayerControl.ControllerListener() {
-
-        @Override
-        public void notifyController(int cmd, int extra) {
-            Message msg = Message.obtain();
-            switch (cmd) {
-                case PlayerControl.CMD_PAUSE:
-                    msg.what = CMD_PAUSE;
-                    break;
-                case PlayerControl.CMD_RESUME:
-                    msg.what = CMD_RESUME;
-                    break;
-                case PlayerControl.CMD_SEEK:
-                    msg.what = CMD_SEEK;
-                    msg.arg1 = extra;
-                    break;
-                case PlayerControl.CMD_START:
-                    msg.what = CMD_START;
-                    break;
-                case PlayerControl.CMD_STOP:
-                    msg.what = CMD_STOP;
-                    break;
-                case PlayerControl.CMD_VOLUME:
-                    msg.what = CMD_VOLUME;
-                    msg.arg1 = extra;
-
-                    break;
-
-                default:
-                    break;
-
-            }
-
-            if (TEST != 0) {
-                mTimerHandler.sendMessage(msg);
-            }
-        }
-    };
-
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-
-        // 注册一个网络状态变化监听的广播,用于wifi切换倒4g时的提示
-        IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
-        registerReceiver(connectionReceiver, intentFilter);
-
-        setContentView(R.layout.activity_play);
-
-        // TODO mPlayingIndex有什么用
-        mPlayingIndex = -1;
-
-        // TODO TEST初始化值为0
-        if (TEST == 1) {
-            mPlayerControl = new PlayerControl(this);
-            mPlayerControl.setControllerListener(mController);
-        }
-
-        acquireWakeLock();
-
-        initView();
-    }
-
     // ***************************************************************************************************************************
     // 获取锁来让屏幕常量
     private void acquireWakeLock() {
@@ -245,6 +199,13 @@ public class PlayerActivity extends Activity {
     // -----------------------------------------------------------------------------------------------------------------------------
 
     // *************************************************************************************************************************
+    private LinearLayout mTipLayout = null;
+    private SeekBar mSeekBar = null;
+    private TextView mTipView = null;
+    private TextView mCurDurationView = null;
+    private TextView mErrInfoView = null;
+    private TextView mDecoderTypeView = null;
+
     // 初始化控件
     private void initView() {
         mTipLayout = findViewById(R.id.LayoutTip);
@@ -272,6 +233,7 @@ public class PlayerActivity extends Activity {
         // 创建SurfaceView控件
         mSurfaceView = new SurfaceView(this);
 
+        // 该对象只是用于在触摸SurfaceView时消费特定的手势动作
         mGestureDetector = new GestureDetector(this, new MyGestureListener());
 
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
@@ -381,7 +343,7 @@ public class PlayerActivity extends Activity {
 
             // 重点:
             if (mPlayer != null) {
-                // 对于从后台切换到前台,需要重设surface;部分手机锁屏也会做前后台切换的处理
+                // 对于从后台切换到前台,需要重设surface;部分手机锁屏也会做前后台切换的处理  在初始化播放器的时候，已经传入了 surface，所以在释放以前的 surface 之前，是不允许再次设置新的 surface 的。也就是说请先 releaseVideoSurface 再 setVideoSurface。
                 mPlayer.setVideoSurface(mSurfaceView.getHolder().getSurface());
             } else {
                 // 创建并启动播放器
@@ -396,12 +358,14 @@ public class PlayerActivity extends Activity {
         public void surfaceChanged(SurfaceHolder holder, int format, int w, int h) {
             Log.d(TAG, "onSurfaceChanged is valid ? " + holder.getSurface().isValid());
             if (mPlayer != null)
+                // 在播放暂停或卡顿时，这个时候旋转手机屏幕，会发生渲染错位。为了解决这一问题，请在surfaceChanged发生时，调用此方法。如果播放界面关闭了自动旋转功能，无须调用此方法。
                 mPlayer.setSurfaceChanged();// TODO
         }
 
         public void surfaceDestroyed(SurfaceHolder holder) {
             Log.d(TAG, "onSurfaceDestroy.");
             if (mPlayer != null) {
+//                通过releaseVideoSurface 释放当前的 surface，但是一旦释放之后，就不能再次调用，否则就会出现黑屏。
                 mPlayer.releaseVideoSurface();// TODO
             }
         }
@@ -451,7 +415,7 @@ public class PlayerActivity extends Activity {
 
         if (mPlayer == null) {
             //  ★★★★★★★★★★★★★★★★★★初始化播放器★★★★★★★★★★★★★★★★★★★★
-            // 创建player对象
+            // 创建player对象,并将mSurfaceView放入
             mPlayer = new AliVcMediaPlayer(this, mSurfaceView);
             // 播放器就绪事件
             mPlayer.setPreparedListener(new VideoPreparedListener());
@@ -564,18 +528,64 @@ public class PlayerActivity extends Activity {
     // ----------------------------------------------------------------------------------------------------------------------------------------
 
 
+    // 设置播放状态监听
+    void setStatusListener(StatusListener listener) {
+        mStatusListener = listener;
+    }
+
+    private PlayerControl.ControllerListener mController = new PlayerControl.ControllerListener() {
+
+        @Override
+        public void notifyController(int cmd, int extra) {
+            Message msg = Message.obtain();
+            switch (cmd) {
+                case PlayerControl.CMD_PAUSE:
+                    msg.what = CMD_PAUSE;
+                    break;
+                case PlayerControl.CMD_RESUME:
+                    msg.what = CMD_RESUME;
+                    break;
+                case PlayerControl.CMD_SEEK:
+                    msg.what = CMD_SEEK;
+                    msg.arg1 = extra;
+                    break;
+                case PlayerControl.CMD_START:
+                    msg.what = CMD_START;
+                    break;
+                case PlayerControl.CMD_STOP:
+                    msg.what = CMD_STOP;
+                    break;
+                case PlayerControl.CMD_VOLUME:
+                    msg.what = CMD_VOLUME;
+                    msg.arg1 = extra;
+                    break;
+                default:
+                    break;
+
+            }
+
+            if (TEST != 0) {
+                mTimerHandler.sendMessage(msg);
+            }
+        }
+    };
+
     private void update_progress(int ms) {
         if (mEnableUpdateProgress) {
+            // 设置进程
             mSeekBar.setProgress(ms);
         }
     }
 
+    // 暂时没用
     private void update_second_progress(int ms) {
         if (mEnableUpdateProgress) {
+            // 设置缓冲进程
             mSeekBar.setSecondaryProgress(ms);
         }
     }
 
+    // 展示进度条ui
     private void show_progress_ui(boolean bShowPause) {
         LinearLayout progress_layout = findViewById(R.id.progress_layout);
         TextView video_title = findViewById(R.id.video_title);
@@ -588,6 +598,7 @@ public class PlayerActivity extends Activity {
         }
     }
 
+    // 展示暂停UI
     private void show_pause_ui(boolean bShowPauseBtn, boolean bShowReplayBtn) {
         LinearLayout layout = findViewById(R.id.buttonLayout);
         if (!bShowPauseBtn && !bShowReplayBtn) {
@@ -602,6 +613,7 @@ public class PlayerActivity extends Activity {
         replay_btn.setVisibility(bShowReplayBtn ? View.VISIBLE : View.GONE);
     }
 
+    // TODO ????????????????????????????
     private int show_tip_ui(boolean bShowTip, float percent) {
 
         int vnum = (int) (percent);
@@ -705,7 +717,7 @@ public class PlayerActivity extends Activity {
     }
 
 
-    //pause the video
+    // 播放器暂停
     private void pause() {
         if (mPlayer != null) {
             mPlayer.pause();
@@ -718,11 +730,11 @@ public class PlayerActivity extends Activity {
         }
     }
 
-    //start the video
+    // 播放正式播放
     private void start() {
-
         if (mPlayer != null) {
             isPausePlayer = false;
+
             isPausedByUser = false;
             isStopPlayer = false;
             mPlayer.play();
@@ -733,7 +745,7 @@ public class PlayerActivity extends Activity {
         }
     }
 
-    //stop the video 
+    // 停止播放器
     private void stop() {
         Log.d(TAG, "AudioRender: stop play");
         if (mPlayer != null) {
@@ -852,10 +864,11 @@ public class PlayerActivity extends Activity {
     Runnable mRunnable = new Runnable() {
         @Override
         public void run() {
-
+            // isPlaying判断视频是否正在播发
             if (mPlayer != null && mPlayer.isPlaying())
+                // 使用获取视频的当前播放位置。去进行更新进度条
                 update_progress(mPlayer.getCurrentPosition());
-
+            // 再次1s后发送，进行循环
             mTimerHandler.postDelayed(this, 1000);
         }
     };
@@ -907,7 +920,7 @@ public class PlayerActivity extends Activity {
     // TODO *********************************************************各种监听回调对象*********************************************************
 
     /**
-     * 准备完成监听器:调度更新进度
+     * 准备完成监听器:调度更新进度， 当SurfaceView走完监听中的surfaceChanged方法后会来到这个监听
      */
     private class VideoPreparedListener implements MediaPlayer.MediaPlayerPreparedListener {
 
@@ -915,11 +928,14 @@ public class PlayerActivity extends Activity {
         public void onPrepared() {
             Log.d(TAG, "onPrepared");
             if (mPlayer != null) {
+                // 设置播放器渲染时的缩放模式，目前有两种模式，VIDEO_ SCALING_ MODE_ SCALE_ TO_ FIT：等比例缩放显示，如果视频长宽比和屏幕长宽比不一致时，会存在黑边；VIDEO_ SCALING_ MODE_ SCALE_ TO_ FIT_ WITH_ CROPPING：带裁边的等比例缩放，如果视频长宽比和屏幕长宽比不一致时，会进行裁边处理以保持全屏显示。
                 mPlayer.setVideoScalingMode(MediaPlayer.VideoScalingMode.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING);
-                update_total_duration(mPlayer.getDuration());
-                mTimerHandler.postDelayed(mRunnable, 1000);
+                // 根据视频时长设置UI
+                update_total_duration(mPlayer.getDuration());// getDuration 获取视频时长，单位为毫秒。
+                mTimerHandler.postDelayed(mRunnable, 1000);//  开启内循环进行更新进度条进度
+                // 展示进度条
                 show_progress_ui(true);
-                mTimerHandler.postDelayed(mUIRunnable, 3000);
+                mTimerHandler.postDelayed(mUIRunnable, 3000);// mUIRunnable的run方法内容没有用处
             }
         }
     }
@@ -1015,7 +1031,6 @@ public class PlayerActivity extends Activity {
                 case MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START:
                     if (mPlayer != null)
                         Log.d(TAG, "on Info first render start : " + ((long) mPlayer.getPropertyDouble(AliVcMediaPlayer.FFP_PROP_DOUBLE_1st_VFRAME_SHOW_TIME, -1) - (long) mPlayer.getPropertyDouble(AliVcMediaPlayer.FFP_PROP_DOUBLE_OPEN_STREAM_TIME, -1)));
-
                     break;
             }
         }

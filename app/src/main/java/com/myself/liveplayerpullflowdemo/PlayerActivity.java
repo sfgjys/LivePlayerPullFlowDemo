@@ -42,8 +42,6 @@ public class PlayerActivity extends Activity {
     public static final int CMD_VOLUME = 5;
     public static final int CMD_SEEK = 6;
 
-    public static final int TEST = 0;
-
 
     private AliVcMediaPlayer mPlayer = null;
     private SurfaceHolder mSurfaceHolder = null;
@@ -59,11 +57,8 @@ public class PlayerActivity extends Activity {
     private MediaPlayer.VideoScalingMode mScalingMode = MediaPlayer.VideoScalingMode.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING;
     private boolean mMute = false;
 
-    private PlayerControl mPlayerControl = null;
 
     private PowerManager.WakeLock mWakeLock = null;
-
-    private StatusListener mStatusListener = null;
 
 
     // 标记播放器是否已经停止
@@ -95,12 +90,6 @@ public class PlayerActivity extends Activity {
 
         // -1代表是播放指定网络视频，不是-1则是多视频循环播放
         mPlayingIndex = -1;
-
-        // TODO TEST初始化值为0 ，且TEST的值一直没变
-        if (TEST == 1) {
-            mPlayerControl = new PlayerControl(this);
-            mPlayerControl.setControllerListener(mController);
-        }
 
         acquireWakeLock();
 
@@ -208,12 +197,17 @@ public class PlayerActivity extends Activity {
 
     // 初始化控件
     private void initView() {
+
         mTipLayout = findViewById(R.id.LayoutTip);
-        mSeekBar = findViewById(R.id.progress);
         mTipView = findViewById(R.id.text_tip);
-        mCurDurationView = findViewById(R.id.current_duration);
+
+        mSeekBar = findViewById(R.id.progress);
+
         mErrInfoView = findViewById(R.id.error_info);
+
         mDecoderTypeView = findViewById(R.id.decoder_type);
+
+        mCurDurationView = findViewById(R.id.current_duration);
 
         initSurface();
     }
@@ -350,8 +344,6 @@ public class PlayerActivity extends Activity {
                 startToPlay();
             }
 
-            if (mPlayerControl != null)
-                mPlayerControl.start();
             Log.d(TAG, "AlivcPlayeron SurfaceCreated over.");
         }
 
@@ -444,7 +436,7 @@ public class PlayerActivity extends Activity {
             // 重点: 在调试阶段可以使用以下方法打开native log
             mPlayer.enableNativeLog();
 
-            // mPosition初始值为0
+            // mPosition初始值为0  直播用不到
             if (mPosition != 0) {
                 // 跳转到指定位置前的第一个关键帧的位置。
                 mPlayer.seekTo(mPosition);
@@ -468,9 +460,6 @@ public class PlayerActivity extends Activity {
         // vidSource.setDomainRegion("你的domain");
         // vidSource.setAuthInfo(你的authinfo");
         // mPlayer.prepareAndPlayWithVid(vidSource);
-
-        if (mStatusListener != null)
-            mStatusListener.notifyStatus(STATUS_START);// 通知状态为开始
 
         // 5秒后显示是硬解码还是软解码
         new Handler().postDelayed(new Runnable() {
@@ -527,49 +516,7 @@ public class PlayerActivity extends Activity {
     }
     // ----------------------------------------------------------------------------------------------------------------------------------------
 
-
-    // 设置播放状态监听
-    void setStatusListener(StatusListener listener) {
-        mStatusListener = listener;
-    }
-
-    private PlayerControl.ControllerListener mController = new PlayerControl.ControllerListener() {
-
-        @Override
-        public void notifyController(int cmd, int extra) {
-            Message msg = Message.obtain();
-            switch (cmd) {
-                case PlayerControl.CMD_PAUSE:
-                    msg.what = CMD_PAUSE;
-                    break;
-                case PlayerControl.CMD_RESUME:
-                    msg.what = CMD_RESUME;
-                    break;
-                case PlayerControl.CMD_SEEK:
-                    msg.what = CMD_SEEK;
-                    msg.arg1 = extra;
-                    break;
-                case PlayerControl.CMD_START:
-                    msg.what = CMD_START;
-                    break;
-                case PlayerControl.CMD_STOP:
-                    msg.what = CMD_STOP;
-                    break;
-                case PlayerControl.CMD_VOLUME:
-                    msg.what = CMD_VOLUME;
-                    msg.arg1 = extra;
-                    break;
-                default:
-                    break;
-
-            }
-
-            if (TEST != 0) {
-                mTimerHandler.sendMessage(msg);
-            }
-        }
-    };
-
+    //  设置mSeekBar的进度条
     private void update_progress(int ms) {
         if (mEnableUpdateProgress) {
             // 设置进程
@@ -577,7 +524,7 @@ public class PlayerActivity extends Activity {
         }
     }
 
-    // 暂时没用
+    // 更新mSeekBar的缓存进度条
     private void update_second_progress(int ms) {
         if (mEnableUpdateProgress) {
             // 设置缓冲进程
@@ -613,33 +560,7 @@ public class PlayerActivity extends Activity {
         replay_btn.setVisibility(bShowReplayBtn ? View.VISIBLE : View.GONE);
     }
 
-    // TODO ????????????????????????????
-    private int show_tip_ui(boolean bShowTip, float percent) {
-
-        int vnum = (int) (percent);
-        vnum = vnum > 100 ? 100 : vnum;
-
-        mTipLayout.setVisibility(bShowTip ? View.VISIBLE : View.GONE);
-        mTipView.setVisibility(bShowTip ? View.VISIBLE : View.GONE);
-
-        if (mLastPercent < 0) {
-            mLastPercent = vnum;
-        } else if (vnum < mLastPercent) {
-            vnum = mLastPercent;
-        } else {
-            mLastPercent = vnum;
-        }
-
-        String strValue = String.format("Buffering(%1$d%%)...", vnum);
-        mTipView.setText(strValue);
-
-        if (!bShowTip) { //hide it, then we need reset the percent value here.
-            mLastPercent = -1;
-        }
-
-        return vnum;
-    }
-
+    // 显示  正在缓存  文本
     private void show_buffering_ui(boolean bShowTip) {
 
         mTipLayout.setVisibility(bShowTip ? View.VISIBLE : View.GONE);
@@ -685,6 +606,7 @@ public class PlayerActivity extends Activity {
 
     }
 
+    // 将错误信息用文本显示
     private void report_error(String err, boolean bshow) {
         if (mErrInfoView.getVisibility() == View.GONE && !bshow) {
             return;
@@ -695,36 +617,12 @@ public class PlayerActivity extends Activity {
     }
 
 
-    public void switchSurface(View view) {
-        if (mPlayer != null) {
-            // release old surface;
-            mPlayer.releaseVideoSurface();
-            mSurfaceHolder.removeCallback(mSurfaceHolderCB);
-            FrameLayout frameContainer = findViewById(R.id.GLViewContainer);
-            frameContainer.removeAllViews();
-
-            // init surface
-            LinearLayout linearLayout = findViewById(R.id.surface_view_container);
-            mSurfaceView = new SurfaceView(this);
-//            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT);
-//            params.gravity = Gravity.CENTER;
-//            mSurfaceView.setLayoutParams(params);
-            linearLayout.addView(mSurfaceView);
-
-            mSurfaceHolder = mSurfaceView.getHolder();
-            mSurfaceHolder.addCallback(mSurfaceHolderCB);
-        }
-    }
-
-
     // 播放器暂停
     private void pause() {
         if (mPlayer != null) {
             mPlayer.pause();
             isPausePlayer = true;
             isPausedByUser = true;
-            if (mStatusListener != null)
-                mStatusListener.notifyStatus(STATUS_PAUSE);
             show_pause_ui(true, false);
             show_progress_ui(true);
         }
@@ -738,8 +636,6 @@ public class PlayerActivity extends Activity {
             isPausedByUser = false;
             isStopPlayer = false;
             mPlayer.play();
-            if (mStatusListener != null)
-                mStatusListener.notifyStatus(STATUS_RESUME);
             show_pause_ui(false, false);
             show_progress_ui(false);
         }
@@ -750,8 +646,6 @@ public class PlayerActivity extends Activity {
         Log.d(TAG, "AudioRender: stop play");
         if (mPlayer != null) {
             mPlayer.stop();
-            if (mStatusListener != null)
-                mStatusListener.notifyStatus(STATUS_STOP);
             mPlayer.destroy();
             mPlayer = null;
         }
@@ -777,8 +671,6 @@ public class PlayerActivity extends Activity {
         if (mPlayer != null) {
             mPosition = mPlayer.getCurrentPosition();
             stop();
-            if (mPlayerControl != null)
-                mPlayerControl.stop();
         }
 
         super.onDestroy();
@@ -833,34 +725,8 @@ public class PlayerActivity extends Activity {
         }
     }
 
-    private Handler mTimerHandler = new Handler() {
-        public void handleMessage(Message msg) {
-            System.out.println();
-            switch (msg.what) {
+    private Handler mTimerHandler = new Handler();
 
-                case CMD_PAUSE:
-                    pause();
-                    break;
-                case CMD_RESUME:
-                    start();
-                    break;
-                case CMD_SEEK:
-                    mPlayer.seekTo(msg.arg1);
-                    break;
-                case CMD_START:
-                    startToPlay();
-                    break;
-                case CMD_STOP:
-                    stop();
-                    break;
-                case CMD_VOLUME:
-                    mPlayer.setVolume(msg.arg1);
-                    break;
-                default:
-                    break;
-            }
-        }
-    };
     Runnable mRunnable = new Runnable() {
         @Override
         public void run() {
@@ -917,7 +783,7 @@ public class PlayerActivity extends Activity {
     }
 
 
-    // TODO *********************************************************各种监听回调对象*********************************************************
+    //  TODO *********************************************************各种监听回调对象*********************************************************
 
     /**
      * 准备完成监听器:调度更新进度， 当SurfaceView走完监听中的surfaceChanged方法后会来到这个监听
